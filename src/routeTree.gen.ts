@@ -15,7 +15,6 @@ import { Route as ProductsRouteImport } from './routes/products'
 import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as BillingTableNameRouteImport } from './routes/billing.$tableName'
 
 const TablesRoute = TablesRouteImport.update({
   id: '/tables',
@@ -47,11 +46,6 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const BillingTableNameRoute = BillingTableNameRouteImport.update({
-  id: '/billing/$tableName',
-  path: '/billing/$tableName',
-  getParentRoute: () => rootRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -60,7 +54,6 @@ export interface FileRoutesByFullPath {
   '/products': typeof ProductsRoute
   '/reports': typeof ReportsRoute
   '/tables': typeof TablesRoute
-  '/billing/$tableName': typeof BillingTableNameRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -69,7 +62,6 @@ export interface FileRoutesByTo {
   '/products': typeof ProductsRoute
   '/reports': typeof ReportsRoute
   '/tables': typeof TablesRoute
-  '/billing/$tableName': typeof BillingTableNameRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -79,7 +71,6 @@ export interface FileRoutesById {
   '/products': typeof ProductsRoute
   '/reports': typeof ReportsRoute
   '/tables': typeof TablesRoute
-  '/billing/$tableName': typeof BillingTableNameRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -90,16 +81,8 @@ export interface FileRouteTypes {
     | '/products'
     | '/reports'
     | '/tables'
-    | '/billing/$tableName'
   fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/'
-    | '/customers'
-    | '/orders'
-    | '/products'
-    | '/reports'
-    | '/tables'
-    | '/billing/$tableName'
+  to: '/' | '/customers' | '/orders' | '/products' | '/reports' | '/tables'
   id:
     | '__root__'
     | '/'
@@ -108,7 +91,6 @@ export interface FileRouteTypes {
     | '/products'
     | '/reports'
     | '/tables'
-    | '/billing/$tableName'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -118,7 +100,6 @@ export interface RootRouteChildren {
   ProductsRoute: typeof ProductsRoute
   ReportsRoute: typeof ReportsRoute
   TablesRoute: typeof TablesRoute
-  BillingTableNameRoute: typeof BillingTableNameRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -165,13 +146,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/billing/$tableName': {
-      id: '/billing/$tableName'
-      path: '/billing/$tableName'
-      fullPath: '/billing/$tableName'
-      preLoaderRoute: typeof BillingTableNameRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
@@ -182,17 +156,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProductsRoute: ProductsRoute,
   ReportsRoute: ReportsRoute,
   TablesRoute: TablesRoute,
-  BillingTableNameRoute: BillingTableNameRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

@@ -2,8 +2,10 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { RouterProvider, createRouter } from '@tanstack/react-router'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { AuthProvider } from '@/contexts/AuthContext'
+import { DataProvider } from '@/contexts/DataContext'
 import { routeTree } from './routeTree.gen'
-import './styles.css'
+import './index.css'
 
 // Create a new QueryClient instance
 const queryClient = new QueryClient()
@@ -25,6 +27,12 @@ declare module '@tanstack/react-router' {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <RouterProvider router={router} />
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <DataProvider>
+          <RouterProvider router={router} />
+        </DataProvider>
+      </AuthProvider>
+    </QueryClientProvider>
   </React.StrictMode>,
 )
