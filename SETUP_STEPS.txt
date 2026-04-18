@@ -1,0 +1,165 @@
+================================================================================
+CHAI MACHINE - SETUP IN 3 SIMPLE STEPS
+================================================================================
+
+STEP 1: CONFIGURE ENVIRONMENT
+================================================================================
+1. Create a new file called: .env.local
+   (in the root directory of your project)
+
+2. Add these 2 lines:
+   VITE_SUPABASE_URL=https://your-project.supabase.co
+   VITE_SUPABASE_PUBLISHABLE_KEY=your-key-here
+
+3. Get these values from:
+   - Go to https://app.supabase.com
+   - Click your project
+   - Settings → API
+   - Copy "Project URL" and "Anon Key"
+
+
+STEP 2: CREATE DATABASE TABLES
+================================================================================
+1. Go to https://app.supabase.com
+2. Click your project name
+3. Click "SQL Editor" (on left side)
+4. Click "New query"
+5. Paste this ENTIRE SQL script:
+
+------- START COPYING HERE -------
+
+CREATE TABLE IF NOT EXISTS users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  email TEXT UNIQUE NOT NULL,
+  role TEXT DEFAULT 'staff',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS inventory (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  category TEXT NOT NULL,
+  price DECIMAL(10, 2) NOT NULL,
+  stock INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS sales (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id),
+  date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  total_amount DECIMAL(12, 2) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS sale_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  sale_id UUID NOT NULL REFERENCES sales(id) ON DELETE CASCADE,
+  item_id UUID NOT NULL REFERENCES inventory(id) ON DELETE CASCADE,
+  quantity INTEGER NOT NULL,
+  price DECIMAL(10, 2) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE inventory ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sales ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sale_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "inventory_public" ON inventory FOR SELECT USING (true);
+CREATE POLICY "inventory_insert" ON inventory FOR INSERT WITH CHECK (true);
+CREATE POLICY "sales_public" ON sales FOR SELECT USING (true);
+CREATE POLICY "sales_insert" ON sales FOR INSERT WITH CHECK (true);
+CREATE POLICY "sale_items_public" ON sale_items FOR SELECT USING (true);
+CREATE POLICY "sale_items_insert" ON sale_items FOR INSERT WITH CHECK (true);
+
+------- STOP COPYING HERE -------
+
+6. Click the blue play button (Run)
+7. Wait for "Query successful"
+8. Done! ✅
+
+
+STEP 3: START THE APPLICATION
+================================================================================
+1. Open terminal/command prompt
+2. Go to your project folder
+3. Run: npm run dev
+4. Open your browser: http://localhost:5173
+
+TEST IT:
+- Go to: http://localhost:5173/inventory
+- Click "Add Product"
+- Add a test product
+- It should appear instantly!
+
+
+WHAT YOU CAN DO NOW:
+================================================================================
+✅ Go to /inventory     → Manage products
+✅ Go to /sales         → Create sales transactions
+✅ Search products      → Search by name/category
+✅ Add products         → Type name, category, price, stock
+✅ Create sales         → Select items, quantities
+✅ Track stock          → Auto-reduces when sold
+✅ Real-time updates    → See changes instantly
+✅ Export CSV           → Download sales data
+
+
+TROUBLESHOOTING:
+================================================================================
+
+Q: "Tables do not exist" error?
+A: You didn't run the SQL script. Go back to Step 2 and run the SQL.
+
+Q: "Cannot find module" error?
+A: Run this: npm install
+
+Q: Page won't load?
+A: Check your .env.local file has correct Supabase keys.
+
+Q: Real-time not working?
+A: In Supabase, make sure "Realtime" is enabled in project settings.
+
+
+FILE LOCATIONS:
+================================================================================
+📁 Inventory Management: src/components/InventoryManager.tsx
+📁 Sales Management:     src/components/SalesManager.tsx
+📁 Data Hooks:           src/hooks/useAppData.ts
+📁 Inventory API:        src/lib/crud-inventory.ts
+📁 Sales API:            src/lib/crud-sales.ts
+📁 Supabase Config:      src/lib/supabase.ts
+
+
+DOCUMENTATION:
+================================================================================
+📖 QUICK_START.md              → 5-minute setup
+📖 PROJECT_README.md           → Full documentation
+📖 DATABASE_SETUP.md           → Database details
+📖 IMPLEMENTATION_SUMMARY.md   → What was built
+📖 FINAL_CHECKLIST.md         → Complete checklist
+
+
+NEXT STEPS:
+================================================================================
+1. Customize the UI (edit Tailwind classes)
+2. Add more features (use useInventory() and useSales() hooks)
+3. Deploy to production (npm run build)
+4. Add authentication
+5. Add payment processing
+
+
+THAT'S IT! 🚀
+================================================================================
+Your inventory & sales system is ready!
+
+Start here:
+1. npm run dev
+2. Go to http://localhost:5173/inventory
+3. Add a product
+4. See it update in real-time!
+
+Questions? Check the documentation files above.

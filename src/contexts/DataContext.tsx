@@ -6,6 +6,7 @@ export interface Product {
   price: number;
   category: string;
   active: boolean;
+  stock: number;
 }
 
 export interface TableItem {
@@ -30,7 +31,7 @@ export interface Order {
   status: "Active" | "Completed";
   items: OrderItem[];
   total_amount: number;
-  payment_method?: "Cash" | "UPI";
+  payment_method?: "Cash" | "UPI" | "Credit";
   created_at: string;
   completed_at?: string;
 }
@@ -39,6 +40,7 @@ export interface Customer {
   id: string;
   name: string;
   phone: string;
+  college?: string;
   visits: number;
   total_spent: number;
 }
@@ -54,11 +56,12 @@ interface DataContextType {
   getActiveOrderForTable: (tableId: string) => Order | undefined;
   createOrder: (tableId: string, tableName: string, customerName?: string) => Order;
   assignCustomerToOrder: (orderId: string, customerName: string) => void;
-  addCustomer: (name: string, phone?: string) => Customer;
+  addCustomer: (name: string, phone?: string, college?: string) => Customer;
   addItemToOrder: (orderId: string, product: Product, quantity?: number) => void;
   updateItemQuantity: (orderId: string, itemId: string, quantity: number) => void;
   removeItemFromOrder: (orderId: string, itemId: string) => void;
-  completeOrder: (orderId: string, method: "Cash" | "UPI") => void;
+  completeOrder: (orderId: string, method: "Cash" | "UPI" | "Credit") => void;
+  payCredit: (orderId: string) => void;
   deleteOrder: (orderId: string) => void;
   addProduct: (p: Omit<Product, "id">) => void;
   editProduct: (id: string, p: Partial<Product>) => void;
@@ -84,18 +87,9 @@ function load<T>(key: string, def: T): T {
   } catch { return def; }
 }
 
-const defaultProducts: Product[] = [
-  { id: "p1", name: "Tea", price: 20, category: "Beverages", active: true },
-  { id: "p2", name: "Coffee", price: 30, category: "Beverages", active: true },
-  { id: "p3", name: "Cake", price: 80, category: "Cakes", active: true },
-  { id: "p4", name: "Puff", price: 25, category: "Snacks", active: true },
-  { id: "p5", name: "Sandwich", price: 60, category: "Snacks", active: true },
-  { id: "p6", name: "Samosa", price: 15, category: "Snacks", active: true },
-  { id: "p7", name: "Bread", price: 40, category: "Bakery", active: true },
-  { id: "p8", name: "Cookies", price: 50, category: "Bakery", active: true },
-  { id: "p9", name: "Juice", price: 35, category: "Beverages", active: true },
-  { id: "p10", name: "Pastry", price: 45, category: "Cakes", active: true },
-];
+import { getProducts } from "@/lib/products";
+
+const defaultProducts: Product[] = [];
 
 const defaultTables: TableItem[] = [
   { id: "t1", name: "Table 1" },
@@ -109,13 +103,27 @@ const defaultTables: TableItem[] = [
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [tables, setTables] = useState<TableItem[]>(() => load("pos_tables", defaultTables));
   const [orders, setOrders] = useState<Order[]>(() => load("pos_orders", []));
-  const [products, setProducts] = useState<Product[]>(() => load("pos_products", defaultProducts));
+  const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>(() => load("pos_customers", []));
 
   useEffect(() => { localStorage.setItem("pos_tables", JSON.stringify(tables)); }, [tables]);
   useEffect(() => { localStorage.setItem("pos_orders", JSON.stringify(orders)); }, [orders]);
-  useEffect(() => { localStorage.setItem("pos_products", JSON.stringify(products)); }, [products]);
   useEffect(() => { localStorage.setItem("pos_customers", JSON.stringify(customers)); }, [customers]);
+
+  useEffect(() => {
+     getProducts().then(res => {
+         if (res.products) {
+            setProducts(res.products.map(p => ({
+               id: p.id,
+               name: p.name,
+               price: p.price,
+               category: p.category || "Other",
+               active: true,
+               stock: p.stock ?? -1
+            })));
+         }
+     });
+  }, []);
 
   const uid = () => crypto.randomUUID();
 
@@ -127,8 +135,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     orders.find(o => o.table_id === tableId && o.status === "Active"), [orders]);
 
   const createOrder = (tableId: string, tableName: string, customerName?: string): Order => {
-    const existing = orders.find(o => o.table_id === tableId && o.status === "Active");
-    if (existing) return existing;
+    if (tableId !== "takeaway") {
+      const existing = orders.find(o => o.table_id === tableId && o.status === "Active");
+      if (existing) return existing;
+    }
     const order: Order = {
       id: uid(), table_id: tableId, table_name: tableName,
       customer_name: customerName,
@@ -143,16 +153,19 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, customer_name: customerName } : o));
   };
 
-  const addCustomer = (name: string, phone = "") => {
+  const addCustomer = (name: string, phone = "", college = "") => {
     const normalized = name.trim();
     const existing = customers.find(c => c.name.trim().toLowerCase() === normalized.toLowerCase());
     if (existing) {
       if (phone.trim() && existing.phone !== phone.trim()) {
         setCustomers(prev => prev.map(c => c.id === existing.id ? { ...c, phone: phone.trim() } : c));
       }
+      if (college.trim() && existing.college !== college.trim()) {
+        setCustomers(prev => prev.map(c => c.id === existing.id ? { ...c, college: college.trim() } : c));
+      }
       return existing;
     }
-    const customer = { id: uid(), name: normalized, phone: phone.trim(), visits: 0, total_spent: 0 };
+    const customer = { id: uid(), name: normalized, phone: phone.trim(), college: college.trim(), visits: 0, total_spent: 0 };
     setCustomers(prev => [...prev, customer]);
     return customer;
   };
@@ -194,7 +207,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }));
   };
 
-  const completeOrder = (orderId: string, method: "Cash" | "UPI") => {
+  const completeOrder = (orderId: string, method: "Cash" | "UPI" | "Credit") => {
     setOrders(prev => {
       const updatedOrders = prev.map(o =>
         o.id === orderId ? { ...o, status: "Completed" as const, payment_method: method, completed_at: new Date().toISOString() } : o
@@ -219,6 +232,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
           id: uid(),
           name: customerName,
           phone: "",
+          college: "",
           visits: 1,
           total_spent: order.total_amount,
         }];
@@ -226,6 +240,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       return updatedOrders;
     });
+  };
+
+  const payCredit = (orderId: string) => {
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, payment_method: "Cash" } : o));
   };
 
   const deleteOrder = (orderId: string) => setOrders(prev => prev.filter(o => o.id !== orderId));
@@ -246,7 +264,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       addTable, editTable, deleteTable,
       getActiveOrderForTable, createOrder,
       addItemToOrder, updateItemQuantity, removeItemFromOrder,
-      completeOrder, deleteOrder,
+      completeOrder, payCredit, deleteOrder,
       addProduct, editProduct, deleteProduct, addCustomer, assignCustomerToOrder,
       todaySales, todayOrders: todayOrders.length, paidAmount, pendingAmount,
     }}>

@@ -1,32 +1,65 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  LayoutDashboard, Grid3X3, ClipboardList, Users, BarChart3, Package, LogOut, Store,
+  LayoutDashboard,
+  Grid3X3,
+  ClipboardList,
+  Users,
+  BarChart3,
+  Package,
+  LogOut,
+  Store,
 } from "lucide-react";
-
-const links = [
-  { to: "/", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/tables", label: "Tables", icon: Grid3X3 },
-  { to: "/orders", label: "Orders", icon: ClipboardList },
-  { to: "/customers", label: "Customers", icon: Users },
-  { to: "/reports", label: "Reports", icon: BarChart3 },
-  { to: "/products", label: "Products", icon: Package },
-];
 
 interface Props {
   children: React.ReactNode;
   title: string;
+  description?: string;
 }
 
-const Layout: React.FC<Props> = ({ children, title }) => {
-  const { logout } = useAuth();
+const Layout: React.FC<Props> = ({ children, title, description }) => {
+  const { logout, user, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  const handleLogout = () => {
-    logout();
-    navigate("/");
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      const { error } = await logout();
+      if (error) {
+        console.error("Logout error:", error);
+      } else {
+        navigate({ to: "/" });
+      }
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
+
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  const userInitial = user?.name?.charAt(0).toUpperCase() || "U";
+  const userRole = user?.role === "admin" ? "Admin" : "Staff";
+
+  const baseLinks = [
+    { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { to: "/products", label: "Products", icon: Package },
+    { to: "/orders", label: "Sales", icon: Grid3X3 },
+    { to: "/tables", label: "Tables", icon: ClipboardList },
+    { to: "/reports", label: "Reports", icon: BarChart3 },
+    { to: "/customers", label: "Customers", icon: Users },
+  ];
+
+  const links = user?.role === "admin"
+    ? [...baseLinks, { to: "/users", label: "Users", icon: Users }]
+    : baseLinks;
 
   return (
     <div className="flex min-h-screen w-full">
@@ -58,10 +91,11 @@ const Layout: React.FC<Props> = ({ children, title }) => {
         <div className="p-3 border-t border-[hsl(var(--sidebar-muted))]">
           <button
             onClick={handleLogout}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium w-full text-[hsl(var(--sidebar-fg))/0.7] hover:bg-[hsl(var(--sidebar-muted))] hover:text-[hsl(var(--sidebar-fg))] transition-colors"
+            disabled={isLoggingOut}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium w-full text-[hsl(var(--sidebar-fg))/0.7] hover:bg-[hsl(var(--sidebar-muted))] hover:text-[hsl(var(--sidebar-fg))] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <LogOut className="w-4 h-4" />
-            Logout
+            {isLoggingOut ? "Logging out..." : "Logout"}
           </button>
         </div>
       </aside>
@@ -69,14 +103,17 @@ const Layout: React.FC<Props> = ({ children, title }) => {
       {/* Main */}
       <div className="flex-1 flex flex-col min-h-screen">
         <header className="h-16 bg-card border-b flex items-center justify-between px-6 flex-shrink-0">
-          <h2 className="text-lg font-bold text-foreground">{title}</h2>
+          <div>
+            <h2 className="text-xl font-bold text-foreground">{title}</h2>
+            {description && <p className="text-sm text-muted-foreground">{description}</p>}
+          </div>
           <div className="flex items-center gap-3">
             <div className="text-right">
-              <p className="text-sm font-semibold text-foreground">Admin</p>
-              <p className="text-xs text-muted-foreground">admin@gmail.com</p>
+              <p className="text-sm font-semibold text-foreground">{user?.name || "User"}</p>
+              <p className="text-xs text-muted-foreground">{userRole}</p>
             </div>
             <div className="w-9 h-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm">
-              A
+              {userInitial}
             </div>
           </div>
         </header>

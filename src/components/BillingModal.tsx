@@ -10,34 +10,67 @@ interface Props {
 }
 
 const BillingModal: React.FC<Props> = ({ tableId, onClose }) => {
-  const { tables, products, getActiveOrderForTable, createOrder, assignCustomerToOrder, addCustomer, addItemToOrder, updateItemQuantity, removeItemFromOrder } = useData();
-  const table = tables.find(t => t.id === tableId);
+  const { tables, products, customers, getActiveOrderForTable, createOrder, assignCustomerToOrder, addCustomer, addItemToOrder, updateItemQuantity, removeItemFromOrder } = useData();
+  const isTakeaway = tableId === "takeaway";
+  const table = isTakeaway ? { id: "takeaway", name: "Takeaway Order" } : tables.find(t => t.id === tableId);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [customerCollege, setCustomerCollege] = useState("");
+  const [showAddCustomer, setShowAddCustomer] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
 
   if (!table) return null;
 
+  // For takeaway, if we're opening it without an active order, we just start fresh
   const order = getActiveOrderForTable(tableId);
+
+  // Sync selected customer with the active order if present
+  const selectedCustomerId = order?.customer_name ? customers.find(c => c.name.toLowerCase() === order.customer_name!.toLowerCase())?.id || "walk-in" : "walk-in";
 
   const handleSaveNewCustomer = () => {
     const name = customerName.trim();
     const phone = customerPhone.trim();
+    const college = customerCollege.trim();
     if (!name) return;
-    const saved = addCustomer(name, phone);
-    setCustomerName(saved.name);
-    setCustomerPhone(saved.phone);
-    if (order && !order.customer_name) {
-      assignCustomerToOrder(order.id, saved.name);
-    }
+    const saved = addCustomer(name, phone, college);
+    
+    // Automatically assign this newly created customer
+    const currentOrder = order ?? createOrder(tableId, isTakeaway ? "Takeaway" : table.name, saved.name);
+    if (order) assignCustomerToOrder(currentOrder.id, saved.name);
+    
+    setShowAddCustomer(false);
+    setCustomerName("");
+    setCustomerPhone("");
+    setCustomerCollege("");
+  };
+
+  const handleCustomerChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+     const val = e.target.value;
+     if (val === "add_new") {
+        setShowAddCustomer(true);
+     } else if (val === "walk-in") {
+        if (order) assignCustomerToOrder(order.id, "");
+     } else {
+        const c = customers.find(x => x.id === val);
+        if (order && c) assignCustomerToOrder(order.id, c.name);
+        else if (c) {
+          // pre-assign logically by storing temporarily or forcing order creation
+          createOrder(tableId, isTakeaway ? "Takeaway" : table.name, c.name);
+        }
+     }
   };
 
   const handleAddProduct = (product: Product) => {
-    const currentOrder = order ?? createOrder(tableId, table.name, customerName?.trim() || undefined);
-    if (order && customerName.trim() && !order.customer_name) {
-      assignCustomerToOrder(order.id, customerName.trim());
+    const currentOrder = order ?? createOrder(tableId, isTakeaway ? "Takeaway" : table.name);
+    // Check stock limit
+    if (product.stock !== -1) {
+      const existingItem = currentOrder.items?.find(i => i.product_id === product.id);
+      const currentQty = existingItem ? existingItem.quantity : 0;
+      if (currentQty >= product.stock) {
+         return; // Prevent exceeding stock
+      }
     }
     addItemToOrder(currentOrder.id, product);
   };
@@ -63,33 +96,12 @@ const BillingModal: React.FC<Props> = ({ tableId, onClose }) => {
           <div className="flex flex-1 overflow-hidden">
             {/* Products */}
             <div className="w-1/2 border-r p-4 overflow-auto">
-              <div className="space-y-4 mb-4">
-                <div className="grid grid-cols-1 gap-3">
-                  <div className="space-y-1">
-                    <p className="text-xs font-semibold text-muted-foreground">Customer details</p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <input
-                        value={customerName}
-                        onChange={e => setCustomerName(e.target.value)}
-                        placeholder="Customer name"
-                        className="rounded-lg border px-3 py-2 bg-background text-sm text-foreground outline-none focus:ring-2 focus:ring-primary"
-                      />
-                      <input
-                        value={customerPhone}
-                        onChange={e => setCustomerPhone(e.target.value)}
-                        placeholder="Phone (optional)"
-                        className="rounded-lg border px-3 py-2 bg-background text-sm text-foreground outline-none focus:ring-2 focus:ring-primary"
-                      />
-                    </div>
-                  </div>
-                  <button
-                    onClick={handleSaveNewCustomer}
-                    disabled={!customerName.trim()}
-                    className="w-full rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold hover:opacity-90 transition disabled:opacity-50"
-                  >
-                    Add customer
-                  </button>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-bold text-foreground">Products</h3>
+                  <p className="text-sm text-muted-foreground">Add items to the current order</p>
                 </div>
+                <span className="text-sm text-muted-foreground">{activeProducts.length} items</span>
               </div>
               <div className="flex gap-2 mb-4">
                 <div className="relative flex-1">
@@ -101,23 +113,62 @@ const BillingModal: React.FC<Props> = ({ tableId, onClose }) => {
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                {activeProducts.map(p => (
-                  <button
-                    key={p.id}
-                    onClick={() => handleAddProduct(p)}
-                    className="p-3 rounded-lg border bg-background hover:border-primary hover:bg-accent transition text-left"
-                  >
-                    <p className="text-sm font-medium text-foreground">{p.name}</p>
-                    <p className="text-xs text-muted-foreground">{p.category}</p>
-                    <p className="text-sm font-bold text-primary mt-1">₹{p.price}</p>
-                  </button>
-                ))}
+                {activeProducts.map(p => {
+                  const outOfStock = p.stock === 0;
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => !outOfStock && handleAddProduct(p)}
+                      disabled={outOfStock}
+                      className={`p-3 rounded-lg border transition text-left relative ${outOfStock ? "opacity-60 cursor-not-allowed bg-muted/50 border-destructive/20" : "bg-background hover:border-primary hover:bg-accent"}`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <p className={`text-sm font-medium ${outOfStock ? "text-muted-foreground line-through" : "text-foreground"}`}>{p.name}</p>
+                        {outOfStock && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded text-destructive bg-destructive/10 whitespace-nowrap ml-2">Out of Stock</span>}
+                      </div>
+                      <p className="text-xs text-muted-foreground">{p.category}</p>
+                      <p className={`text-sm font-bold mt-1 ${outOfStock ? "text-muted-foreground line-through" : "text-primary"}`}>₹{p.price}</p>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
             {/* Order Items */}
-            <div className="w-1/2 p-4 flex flex-col overflow-auto">
-              <h3 className="font-bold text-foreground mb-3">Order Items</h3>
+            <div className="w-1/2 p-4 flex flex-col overflow-auto bg-muted/10">
+              <div className="flex items-center justify-between mb-3">
+                 <h3 className="font-bold text-foreground">Order Items</h3>
+                 {isTakeaway && (
+                   <div className="relative">
+                      <select
+                        value={selectedCustomerId}
+                        onChange={handleCustomerChange}
+                        className="border rounded-lg pl-3 pr-8 py-1.5 bg-background text-sm font-medium focus:ring-2 outline-none appearance-none"
+                      >
+                         <option value="walk-in">Walk-in (No Customer)</option>
+                         {customers.map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                         ))}
+                         <option disabled>──────────</option>
+                         <option value="add_new">+ Add New Customer</option>
+                      </select>
+                   </div>
+                 )}
+              </div>
+
+              {isTakeaway && showAddCustomer && (
+                <div className="mb-4 bg-card border rounded-xl p-3 shadow-sm relative text-sm">
+                   <button onClick={() => setShowAddCustomer(false)} className="absolute right-2 top-2 p-1 hover:bg-muted rounded"><X className="w-4 h-4" /></button>
+                   <h4 className="font-bold mb-2">New Customer</h4>
+                   <div className="space-y-2">
+                       <input value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="Name *" className="w-full border rounded px-2 py-1.5 focus:ring-2 outline-none" />
+                       <input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="Phone" className="w-full border rounded px-2 py-1.5 focus:ring-2 outline-none" />
+                       <input value={customerCollege} onChange={e => setCustomerCollege(e.target.value)} placeholder="College" className="w-full border rounded px-2 py-1.5 focus:ring-2 outline-none" />
+                       <button onClick={handleSaveNewCustomer} disabled={!customerName.trim()} className="w-full bg-primary text-primary-foreground py-1.5 rounded font-bold hover:opacity-90 disabled:opacity-50 mt-1">Add Customer</button>
+                   </div>
+                </div>
+              )}
+
               {!order || order.items.length === 0 ? (
                 <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">No items yet</div>
               ) : (
@@ -133,7 +184,14 @@ const BillingModal: React.FC<Props> = ({ tableId, onClose }) => {
                           <Minus className="w-3 h-3" />
                         </button>
                         <span className="text-sm font-bold w-6 text-center text-foreground">{item.quantity}</span>
-                        <button onClick={() => updateItemQuantity(order!.id, item.id, item.quantity + 1)} className="w-7 h-7 rounded-md border flex items-center justify-center hover:bg-muted transition">
+                        <button 
+                          onClick={() => {
+                             const product = products.find(p => p.id === item.product_id);
+                             if (product && product.stock !== -1 && item.quantity >= product.stock) return;
+                             updateItemQuantity(order!.id, item.id, item.quantity + 1);
+                          }} 
+                          className="w-7 h-7 rounded-md border flex items-center justify-center hover:bg-muted transition"
+                        >
                           <Plus className="w-3 h-3" />
                         </button>
                       </div>

@@ -24,6 +24,9 @@ const Tables: React.FC = () => {
   const getActiveOrder = (tableId: string) =>
     orders.find(o => o.table_id === tableId && o.status === "Active" && o.total_amount > 0);
 
+  const getTakeawayOrders = () => 
+    orders.filter(o => o.table_id === "takeaway" && o.status === "Active");
+
   return (
     <Layout title="Tables">
       <div className="flex items-center justify-between mb-6">
@@ -31,6 +34,51 @@ const Tables: React.FC = () => {
         <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-semibold hover:opacity-90 transition">
           <Plus className="w-4 h-4" /> Add Table
         </button>
+      </div>
+
+      <div className="mb-6">
+        <h2 className="text-lg font-bold mb-4">Takeaway Options</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            whileHover={{ y: -4 }}
+            className="bg-primary/5 rounded-xl border border-primary/20 p-5 cursor-pointer relative group flex items-center gap-4"
+            onClick={() => setBillingTableId("takeaway")}
+          >
+            <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
+              <Plus className="w-6 h-6 text-primary" />
+            </div>
+            <div>
+              <h3 className="font-bold text-foreground">New Takeaway</h3>
+              <p className="text-xs text-muted-foreground">Start a walk-in order</p>
+            </div>
+          </motion.div>
+          {getTakeawayOrders().map((order) => (
+             <motion.div
+               key={order.id}
+               initial={{ opacity: 0, y: 20 }}
+               animate={{ opacity: 1, y: 0 }}
+               className="bg-card rounded-xl border p-5 cursor-pointer relative group"
+               onClick={() => setBillingTableId("takeaway")}
+             >
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h3 className="font-bold text-foreground">Takeaway #{order.id.slice(0,4)}</h3>
+                    {order.customer_name && <p className="text-xs text-muted-foreground">Customer: {order.customer_name}</p>}
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium px-2 py-1 rounded-full bg-destructive/10 text-destructive">Unpaid</span>
+                  <span className="text-sm font-bold text-foreground">₹{order.total_amount}</span>
+                </div>
+             </motion.div>
+          ))}
+        </div>
+      </div>
+
+      <div className="mb-4 flex items-center gap-2">
+         <h2 className="text-lg font-bold">Dine-in Tables</h2>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
