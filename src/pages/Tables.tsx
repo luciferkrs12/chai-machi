@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import Layout from "@/components/Layout";
 import { useData } from "@/contexts/DataContext";
 import BillingModal from "@/components/BillingModal";
+import InvoiceModal from "@/components/InvoiceModal";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Pencil, Trash2, X } from "lucide-react";
 
@@ -12,6 +13,7 @@ const Tables: React.FC = () => {
   const [editId, setEditId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [billingTableId, setBillingTableId] = useState<string | null>(null);
+  const [invoiceOrderId, setInvoiceOrderId] = useState<string | null>(null);
 
   const handleAdd = () => {
     if (newName.trim()) { addTable(newName.trim()); setNewName(""); setShowAdd(false); }
@@ -26,6 +28,8 @@ const Tables: React.FC = () => {
 
   const getTakeawayOrders = () => 
     orders.filter(o => o.table_id === "takeaway" && o.status === "Active");
+
+  const invoiceOrder = invoiceOrderId ? orders.find(o => o.id === invoiceOrderId) : null;
 
   return (
     <Layout title="Tables">
@@ -68,9 +72,15 @@ const Tables: React.FC = () => {
                     {order.customer_name && <p className="text-xs text-muted-foreground">Customer: {order.customer_name}</p>}
                   </div>
                 </div>
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-3">
                   <span className="text-xs font-medium px-2 py-1 rounded-full bg-destructive/10 text-destructive">Unpaid</span>
                   <span className="text-sm font-bold text-foreground">₹{order.total_amount}</span>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setInvoiceOrderId(order.id); }}
+                    className="text-xs font-semibold text-primary border border-primary/20 px-2 py-1 rounded-full hover:bg-primary/5 transition"
+                  >
+                    Invoice
+                  </button>
                 </div>
              </motion.div>
           ))}
@@ -115,9 +125,15 @@ const Tables: React.FC = () => {
                 </div>
               </div>
               {active ? (
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-3">
                   <span className="text-xs font-medium px-2 py-1 rounded-full bg-destructive/10 text-destructive">Occupied</span>
                   <span className="text-sm font-bold text-foreground">₹{active.total_amount}</span>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setInvoiceOrderId(active.id); }}
+                    className="text-xs font-semibold text-primary border border-primary/20 px-2 py-1 rounded-full hover:bg-primary/5 transition"
+                  >
+                    Invoice
+                  </button>
                 </div>
               ) : (
                 <span className="text-xs font-medium px-2 py-1 rounded-full bg-success/10 text-success">Available</span>
@@ -162,6 +178,9 @@ const Tables: React.FC = () => {
       {/* Billing */}
       {billingTableId && (
         <BillingModal tableId={billingTableId} onClose={() => setBillingTableId(null)} />
+      )}
+      {invoiceOrder && (
+        <InvoiceModal order={invoiceOrder} onClose={() => setInvoiceOrderId(null)} />
       )}
     </Layout>
   );

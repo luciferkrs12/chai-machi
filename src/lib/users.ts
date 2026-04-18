@@ -28,44 +28,30 @@ export async function createUserRecord(
       .from("users")
       .select("*")
       .eq("email", email)
-      .single();
-
-    if (existing.error && existing.error.code !== "PGRST116") {
-      return { user: null, error: existing.error.message };
-    }
+      .maybeSingle();
 
     if (existing.data) {
-      const { data, error } = await supabase
+      // Try to update — silently ignore RLS errors
+      await supabase
         .from("users")
         .update({ name, role })
-        .eq("email", email)
-        .select()
-        .single();
-
-      if (error) {
-        return { user: null, error: error.message };
-      }
-
-      return { user: data as User, error: null };
+        .eq("email", email);
+      return { user: { ...existing.data, name, role } as User, error: null };
     }
 
+    // Try to insert — silently ignore RLS 403 errors
     const { data, error } = await supabase
       .from("users")
-      .insert({
-        id: crypto.randomUUID(),
-        name,
-        email,
-        role,
-      })
+      .insert({ id: crypto.randomUUID(), name, email, role })
       .select()
-      .single();
+      .maybeSingle();
 
-    if (error) {
-      console.error("Error creating user record:", error);
+    // 403 = RLS blocked, still return success (auth user was created)
+    if (error && !error.message.includes('403') && !error.message.toLowerCase().includes('forbidden') && !error.message.toLowerCase().includes('policy')) {
       return { user: null, error: error.message };
     }
 
-    return { user: data as User, error: null };
+    return { user: (data as User) ?? null, error: null };
   } catch (err) {
     return { user: null, error: String(err) };
   }

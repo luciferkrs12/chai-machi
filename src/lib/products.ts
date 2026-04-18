@@ -76,23 +76,32 @@ export async function addProduct(
 
 export async function updateProduct(
   id: string,
-  updates: Partial<Omit<Product, "id" | "created_at" | "total_sold" | "daily_added_stock" | "stock">> & { stock?: number }
+  updates: Partial<Omit<Product, "id" | "created_at" | "total_sold" | "stock">> & { stock?: number; daily_added_stock?: number }
 ): Promise<{ product: Product | null; error: string | null }> {
   try {
     const { data, error } = await supabase
       .from("products")
       .update({
         ...updates,
-      })
+      }, { returning: "representation" })
       .eq("id", id)
-      .select()
       .maybeSingle();
 
     if (error) {
       return { product: null, error: error.message };
     }
 
-    return { product: data as Product, error: null };
+    if (data) {
+      return { product: data as Product, error: null };
+    }
+
+    // Some Supabase configurations may not return the updated row directly.
+    const { product, error: fetchError } = await getProductById(id);
+    if (fetchError || !product) {
+      return { product: null, error: fetchError || "No product returned from update." };
+    }
+
+    return { product, error: null };
   } catch (error) {
     return { product: null, error: String(error) };
   }

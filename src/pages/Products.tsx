@@ -146,9 +146,50 @@ const ProductsPage: React.FC = () => {
         setProducts((prev) => prev.map((item) => (item.id === product.id ? product : item)));
       }
       setShowStockModal(false);
+      setAddedQuantity(stockModalMode === "set" ? String(stockProduct.stock) : "0");
     } finally {
       setIsStocking(false);
     }
+  };
+
+  const handleResetModalInput = () => {
+    if (!stockProduct) return;
+    setAddedQuantity(stockModalMode === "set" ? String(stockProduct.stock) : "0");
+    setError("");
+  };
+
+  const handleResetDailyAdditions = async () => {
+    if (!window.confirm("Reset all daily additions to zero?")) return;
+    setError("");
+
+    const updates = await Promise.all(products.map(async (product) => {
+      if (product.stock < 0) return null;
+      return await updateProduct(product.id, { daily_added_stock: 0 });
+    }));
+
+    const hasError = updates.some(item => item?.error);
+    if (hasError) {
+      setError("Unable to reset daily stock counts for some products.");
+    }
+
+    const { products: refreshedProducts, error: loadError } = await getProducts();
+    if (loadError || !refreshedProducts) {
+      setProducts((prev) => prev.map((product) => ({ ...product, daily_added_stock: product.stock >= 0 ? 0 : product.daily_added_stock })));
+      if (loadError) setError(loadError);
+      return;
+    }
+
+    setProducts(refreshedProducts);
+  };
+
+  const handleResetProductDailyAddition = async (productId: string) => {
+    setError("");
+    const { product, error } = await updateProduct(productId, { daily_added_stock: 0 });
+    if (error || !product) {
+      setError(error || "Unable to reset daily addition for this product.");
+      return;
+    }
+    setProducts((prev) => prev.map((item) => (item.id === product.id ? product : item)));
   };
 
   const handleDeleteProduct = async (id: string) => {
@@ -193,6 +234,14 @@ const ProductsPage: React.FC = () => {
                className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 transition"
              >
                <Plus className="w-4 h-4" /> Add Product
+             </button>
+           )}
+           {isAdmin && activeTab === 'stock' && (
+             <button
+               onClick={handleResetDailyAdditions}
+               className="inline-flex items-center gap-2 rounded-lg border border-destructive px-4 py-2 text-sm font-semibold text-destructive hover:bg-destructive/10 transition"
+             >
+               Reset Daily Additions
              </button>
            )}
         </div>
@@ -281,12 +330,19 @@ const ProductsPage: React.FC = () => {
                             </td>
                             <td className="py-3 px-6">
                                {isAdmin && hasStock && (
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex flex-wrap items-center gap-2">
                                     <button onClick={() => openStockModal(product, "add")} className="bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground font-bold px-3 py-1.5 rounded-lg transition text-xs">
                                        + Add
                                     </button>
                                     <button onClick={() => openStockModal(product, "set")} className="border border-input hover:bg-muted text-foreground font-bold px-3 py-1.5 rounded-lg transition text-xs flex items-center gap-1">
                                        <Pencil className="w-3 h-3" /> Set
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleResetProductDailyAddition(product.id)}
+                                      className="border border-destructive text-destructive hover:bg-destructive/10 font-bold px-3 py-1.5 rounded-lg transition text-xs"
+                                    >
+                                      Reset
                                     </button>
                                   </div>
                                )}
@@ -444,13 +500,22 @@ const ProductsPage: React.FC = () => {
                   />
                 </div>
                 {error && <p className="text-sm text-destructive">{error}</p>}
-                <button
-                  onClick={handleAddStock}
-                  disabled={isStocking}
-                  className="inline-flex items-center justify-center rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground hover:opacity-90 transition disabled:opacity-50 mt-2"
-                >
-                  {isStocking ? "Saving..." : stockModalMode === "add" ? "Add to Stock" : "Set Exact Stock"}
-                </button>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <button
+                    onClick={handleAddStock}
+                    disabled={isStocking}
+                    className="inline-flex items-center justify-center rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground hover:opacity-90 transition disabled:opacity-50"
+                  >
+                    {isStocking ? "Saving..." : stockModalMode === "add" ? "Add to Stock" : "Set Exact Stock"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResetModalInput}
+                    className="inline-flex items-center justify-center rounded-2xl border border-input px-5 py-3 text-sm font-semibold text-foreground hover:bg-muted transition"
+                  >
+                    Reset
+                  </button>
+                </div>
               </div>
             </motion.div>
           </motion.div>

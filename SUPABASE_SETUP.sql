@@ -25,6 +25,23 @@ CREATE POLICY "Admins can read all users" ON users
     )
   );
 
+CREATE POLICY "Admins can insert users" ON users
+  FOR INSERT WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin'
+    )
+  );
+
+CREATE POLICY "Users can insert their own profile" ON users
+  FOR INSERT WITH CHECK (
+    auth.uid() = id
+    AND role IN ('staff', 'admin')
+    AND (
+      role = 'staff'
+      OR auth.email() IN ('naren2004dn@gmail.com', 'naren092104@gmail.com')
+    )
+  );
+
 CREATE POLICY "Users can update own profile" ON users
   FOR UPDATE USING (auth.uid() = id)
   WITH CHECK (auth.uid() = id AND role = (SELECT role FROM users WHERE id = auth.uid()));

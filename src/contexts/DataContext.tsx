@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { updateProduct } from "@/lib/products";
+import { getCustomers as fetchCustomers, addCustomer as saveCustomer } from "@/lib/crud-customers";
 
 export interface Product {
   id: string;
@@ -61,8 +63,9 @@ interface DataContextType {
   updateItemQuantity: (orderId: string, itemId: string, quantity: number) => void;
   removeItemFromOrder: (orderId: string, itemId: string) => void;
   completeOrder: (orderId: string, method: "Cash" | "UPI" | "Credit") => void;
-  payCredit: (orderId: string) => void;
+  payCredit: (orderId: string, method: "Cash" | "UPI") => void;
   deleteOrder: (orderId: string) => void;
+  addManualCreditEntry: (customerName: string, description: string, amount: number) => void;
   addProduct: (p: Omit<Product, "id">) => void;
   editProduct: (id: string, p: Partial<Product>) => void;
   deleteProduct: (id: string) => void;
@@ -125,6 +128,18 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
      });
   }, []);
 
+  useEffect(() => {
+    fetchCustomers().then(res => {
+      if (res.customers.length > 0) {
+        setCustomers(res.customers.map(c => ({
+          ...c,
+          visits: 0,
+          total_spent: 0,
+        })));
+      }
+    });
+  }, []);
+
   const uid = () => crypto.randomUUID();
 
   const addTable = (name: string) => setTables(t => [...t, { id: uid(), name }]);
@@ -165,8 +180,18 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       return existing;
     }
-    const customer = { id: uid(), name: normalized, phone: phone.trim(), college: college.trim(), visits: 0, total_spent: 0 };
+
+    const customer = {
+      id: uid(),
+      name: normalized,
+      phone: phone.trim(),
+      college: college.trim(),
+      visits: 0,
+      total_spent: 0,
+    };
+
     setCustomers(prev => [...prev, customer]);
+    void saveCustomer({ id: customer.id, name: customer.name, phone: customer.phone, college: customer.college });
     return customer;
   };
 
@@ -209,12 +234,33 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const completeOrder = (orderId: string, method: "Cash" | "UPI" | "Credit") => {
     setOrders(prev => {
+      const existingOrder = prev.find(o => o.id === orderId);
+      if (!existingOrder || existingOrder.status === "Completed") return prev;
+
       const updatedOrders = prev.map(o =>
         o.id === orderId ? { ...o, status: "Completed" as const, payment_method: method, completed_at: new Date().toISOString() } : o
       );
 
       const order = updatedOrders.find(o => o.id === orderId);
-      if (!order || !order.customer_name) return updatedOrders;
+      if (!order) return updatedOrders;
+
+      const stockUpdatePromises = order.items.map(item => {
+        const product = products.find(p => p.id === item.product_id);
+        if (!product || product.stock === -1) return Promise.resolve(null);
+        const newStock = Math.max(0, product.stock - item.quantity);
+        return updateProduct(product.id, { stock: newStock });
+      });
+
+      setProducts(prevProducts => prevProducts.map(p => {
+        const orderedItem = order.items.find(i => i.product_id === p.id);
+        if (!orderedItem || p.stock === -1) return p;
+        const newStock = Math.max(0, p.stock - orderedItem.quantity);
+        return { ...p, stock: newStock };
+      }));
+
+      void Promise.all(stockUpdatePromises);
+
+      if (!order.customer_name) return updatedOrders;
 
       const customerName = order.customer_name.trim();
       setCustomers(prevCustomers => {
@@ -242,11 +288,30 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
-  const payCredit = (orderId: string) => {
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, payment_method: "Cash" } : o));
+  const payCredit = (orderId: string, method: "Cash" | "UPI" = "Cash") => {
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, payment_method: method } : o));
   };
 
   const deleteOrder = (orderId: string) => setOrders(prev => prev.filter(o => o.id !== orderId));
+
+  const addManualCreditEntry = (customerName: string, description: string, amount: number) => {
+    const now = new Date().toISOString();
+    const itemId = uid();
+    const orderId = uid();
+    const newOrder: Order = {
+      id: orderId,
+      table_id: "manual",
+      table_name: "Manual Entry",
+      customer_name: customerName,
+      status: "Completed",
+      items: [{ id: itemId, product_id: "manual", product_name: description, quantity: 1, price: amount, total: amount }],
+      total_amount: amount,
+      payment_method: "Credit",
+      created_at: now,
+      completed_at: now,
+    };
+    setOrders(prev => [newOrder, ...prev]);
+  };
 
   const addProduct = (p: Omit<Product, "id">) => setProducts(prev => [...prev, { ...p, id: uid() }]);
   const editProduct = (id: string, p: Partial<Product>) => setProducts(prev => prev.map(x => x.id === id ? { ...x, ...p } : x));
@@ -264,7 +329,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       addTable, editTable, deleteTable,
       getActiveOrderForTable, createOrder,
       addItemToOrder, updateItemQuantity, removeItemFromOrder,
-      completeOrder, payCredit, deleteOrder,
+      completeOrder, payCredit, deleteOrder, addManualCreditEntry,
       addProduct, editProduct, deleteProduct, addCustomer, assignCustomerToOrder,
       todaySales, todayOrders: todayOrders.length, paidAmount, pendingAmount,
     }}>

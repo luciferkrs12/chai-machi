@@ -41,7 +41,7 @@ export async function getCustomer(id: string): Promise<{
   }
 }
 
-export async function addCustomer(customer: Omit<Customer, "id" | "created_at">): Promise<{
+export async function addCustomer(customer: Omit<Customer, "created_at">): Promise<{
   customer: Customer | null;
   error: string | null;
 }> {

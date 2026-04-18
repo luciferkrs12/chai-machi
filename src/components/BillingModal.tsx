@@ -10,7 +10,7 @@ interface Props {
 }
 
 const BillingModal: React.FC<Props> = ({ tableId, onClose }) => {
-  const { tables, products, customers, getActiveOrderForTable, createOrder, assignCustomerToOrder, addCustomer, addItemToOrder, updateItemQuantity, removeItemFromOrder } = useData();
+  const { tables, products, customers, getActiveOrderForTable, createOrder, assignCustomerToOrder, addCustomer, addItemToOrder, updateItemQuantity, removeItemFromOrder, completeOrder } = useData();
   const isTakeaway = tableId === "takeaway";
   const table = isTakeaway ? { id: "takeaway", name: "Takeaway Order" } : tables.find(t => t.id === tableId);
   const [search, setSearch] = useState("");
@@ -209,13 +209,31 @@ const BillingModal: React.FC<Props> = ({ tableId, onClose }) => {
                   <span className="text-lg font-bold text-foreground">Total</span>
                   <span className="text-2xl font-bold text-primary">₹{order?.total_amount ?? 0}</span>
                 </div>
-                <button
-                  onClick={() => order && order.items.length > 0 && setShowPayment(true)}
-                  disabled={!order || order.items.length === 0}
-                  className="w-full py-3 rounded-lg bg-primary text-primary-foreground font-bold text-sm hover:opacity-90 transition disabled:opacity-50"
-                >
-                  Pay ₹{order?.total_amount ?? 0}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => order && order.items.length > 0 && setShowPayment(true)}
+                    disabled={!order || order.items.length === 0}
+                    className="flex-1 py-3 rounded-lg bg-primary text-primary-foreground font-bold text-sm hover:opacity-90 transition disabled:opacity-50"
+                  >
+                    Pay ₹{order?.total_amount ?? 0}
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (!order || order.items.length === 0) return;
+                      if (!order.customer_name) {
+                        alert("Please select a customer before using Pay Later.");
+                        return;
+                      }
+                      completeOrder(order.id, "Credit");
+                      onClose();
+                    }}
+                    disabled={!order || order.items.length === 0}
+                    title="Customer will pay later"
+                    className="px-4 py-3 rounded-lg border-2 border-destructive text-destructive font-bold text-sm hover:bg-destructive/10 transition disabled:opacity-50 whitespace-nowrap"
+                  >
+                    Pay Later
+                  </button>
+                </div>
               </div>
             </div>
           </div>

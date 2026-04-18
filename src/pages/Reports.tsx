@@ -1,107 +1,64 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import Layout from "@/components/Layout";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
-import { getAllSales } from "@/lib/sales";
-import { getAllInventory } from "@/lib/inventory";
+import { useData } from "@/contexts/DataContext";
 
 const Reports: React.FC = () => {
+  const { orders, products } = useData();
   const [month, setMonth] = useState(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   });
-  const [sales, setSales] = useState<any[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      setError("");
-      const [salesResult, inventoryResult] = await Promise.all([getAllSales(), getAllInventory()]);
-
-      if (salesResult.error) {
-        setError(salesResult.error);
-      } else {
-        setSales(salesResult.sales || []);
-      }
-
-      if (inventoryResult.error) {
-        setError((prev) => prev || inventoryResult.error);
-      } else {
-        setProducts(inventoryResult.items || []);
-      }
-
-      setLoading(false);
-    };
-
-    loadData();
-  }, []);
-
-  const completedSales = useMemo(
-    () => sales.filter((sale) => sale.total_amount >= 0),
-    [sales]
+  const completedOrders = useMemo(
+    () => orders.filter((o) => o.status === "Completed"),
+    [orders]
   );
 
   const filteredSales = useMemo(() => {
     const [year, monthValue] = month.split("-").map(Number);
-    return completedSales.filter((sale) => {
-      const saleDate = new Date(sale.date);
-      return saleDate.getFullYear() === year && saleDate.getMonth() + 1 === monthValue;
+    return completedOrders.filter((o) => {
+      const d = new Date(o.completed_at ?? o.created_at);
+      return d.getFullYear() === year && d.getMonth() + 1 === monthValue;
     });
-  }, [completedSales, month]);
+  }, [completedOrders, month]);
 
-  const totalRevenue = filteredSales.reduce((sum, sale) => sum + (sale.total_amount || 0), 0);
+  const totalRevenue = filteredSales.reduce((sum, o) => sum + (o.total_amount || 0), 0);
   const totalOrders = filteredSales.length;
   const avgOrder = totalOrders ? Math.round(totalRevenue / totalOrders) : 0;
-  const itemsSold = filteredSales.reduce((sum, sale) => {
-    return sum + (sale.items?.reduce((subSum: number, item: any) => subSum + (item?.quantity || 0), 0) || 0);
+  const itemsSold = filteredSales.reduce((sum, o) => {
+    return sum + o.items.reduce((s: number, i: any) => s + (i?.quantity || 0), 0);
   }, 0);
 
   const chartData = useMemo(() => {
     const [year, monthValue] = month.split("-").map(Number);
     const days = new Date(year, monthValue, 0).getDate();
     const data = Array.from({ length: days }, (_, idx) => ({ day: idx + 1, sales: 0 }));
-
-    filteredSales.forEach((sale) => {
-      const saleDate = new Date(sale.date);
-      const dayIndex = saleDate.getDate() - 1;
-      if (dayIndex >= 0 && dayIndex < data.length) {
-        data[dayIndex].sales += sale.total_amount || 0;
-      }
+    filteredSales.forEach((o) => {
+      const d = new Date(o.completed_at ?? o.created_at);
+      const dayIndex = d.getDate() - 1;
+      if (dayIndex >= 0 && dayIndex < data.length) data[dayIndex].sales += o.total_amount || 0;
     });
-
     return data;
   }, [filteredSales, month]);
 
   const productPerformance = useMemo(() => {
-    const counts = filteredSales.reduce((acc, sale) => {
-      (sale.items || []).forEach((item: any) => {
-        const key = item.item_id || item.product_id || "unknown";
+    const counts = filteredSales.reduce((acc, o) => {
+      (o.items || []).forEach((item: any) => {
+        const key = item.product_id || item.item_id || item.product_name || "unknown";
         acc[key] = (acc[key] || 0) + (item.quantity || 0);
       });
       return acc;
     }, {} as Record<string, number>);
-
     return Object.entries(counts)
       .map(([id, quantity]) => ({
         id,
-        name: products.find((p) => p.id === id)?.name || "Unknown product",
+        name: products.find((p) => p.id === id)?.name || id,
         quantity,
       }))
       .sort((a, b) => b.quantity - a.quantity)
       .slice(0, 5);
   }, [filteredSales, products]);
-
-  if (loading) {
-    return (
-      <Layout title="Reports">
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        </div>
-      </Layout>
-    );
-  }
 
   return (
     <Layout title="Reports">
@@ -115,11 +72,7 @@ const Reports: React.FC = () => {
         />
       </div>
 
-      {error && (
-        <div className="mb-4 rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">
-          {error}
-        </div>
-      )}
+
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-8">
         {[
