@@ -308,7 +308,8 @@ const ProductsPage: React.FC = () => {
           </div>
         ) : (
           <div className="bg-card rounded-2xl border overflow-hidden">
-             <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+             <table className="w-full text-sm min-w-[640px]">
                 <thead className="bg-muted/30 border-b">
                    <tr>
                       <th className="text-left font-semibold py-4 px-6 text-muted-foreground">Product</th>
@@ -366,7 +367,8 @@ const ProductsPage: React.FC = () => {
                    })}
                 </tbody>
              </table>
-          </div>
+            </div>
+           </div>
         )}
       </div>
 

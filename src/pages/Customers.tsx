@@ -215,8 +215,8 @@ const Customers: React.FC = () => {
       </div>
 
       {/* Search + Add */}
-      <div className="flex justify-between items-center mb-4">
-        <div className="w-full max-w-sm relative">
+      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between mb-4">
+        <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input
             type="text"
@@ -228,7 +228,7 @@ const Customers: React.FC = () => {
         </div>
         <button
           onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg font-semibold text-sm hover:opacity-90"
+          className="flex items-center justify-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg font-semibold text-sm hover:opacity-90 flex-shrink-0"
         >
           + Add Customer
         </button>
@@ -236,7 +236,8 @@ const Customers: React.FC = () => {
 
       {/* Customers Table */}
       <div className="bg-card rounded-xl border overflow-hidden mb-6">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[640px]">
           <thead>
             <tr className="border-b bg-muted/30">
               <th className="text-left font-semibold text-muted-foreground py-3 px-6">Customer</th>
@@ -285,6 +286,7 @@ const Customers: React.FC = () => {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Customer Ledger Drawer */}
