@@ -47,11 +47,20 @@ export interface Customer {
   total_spent: number;
 }
 
+export interface QrSettings {
+  enableQr: boolean;
+  upiId: string;
+  merchantName: string;
+  qrImageUrl: string;
+}
+
 interface DataContextType {
   tables: TableItem[];
   orders: Order[];
   products: Product[];
   customers: Customer[];
+  qrSettings: QrSettings;
+  updateQrSettings: (updates: Partial<QrSettings>) => void;
   addTable: (name: string) => void;
   editTable: (id: string, name: string) => void;
   deleteTable: (id: string) => void;
@@ -108,10 +117,17 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [orders, setOrders] = useState<Order[]>(() => load("pos_orders", []));
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>(() => load("pos_customers", []));
+  const [qrSettings, setQrSettings] = useState<QrSettings>(() => load("pos_qr_settings", {
+    enableQr: true,
+    upiId: "naren2004dnb@okaxis",
+    merchantName: "Sri Vinayaga Bakes",
+    qrImageUrl: "",
+  }));
 
   useEffect(() => { localStorage.setItem("pos_tables", JSON.stringify(tables)); }, [tables]);
   useEffect(() => { localStorage.setItem("pos_orders", JSON.stringify(orders)); }, [orders]);
   useEffect(() => { localStorage.setItem("pos_customers", JSON.stringify(customers)); }, [customers]);
+  useEffect(() => { localStorage.setItem("pos_qr_settings", JSON.stringify(qrSettings)); }, [qrSettings]);
 
   useEffect(() => {
      getProducts().then(res => {
@@ -292,6 +308,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, payment_method: method } : o));
   };
 
+  const updateQrSettings = (updates: Partial<QrSettings>) => {
+    setQrSettings(prev => ({ ...prev, ...updates }));
+  };
+
   const deleteOrder = (orderId: string) => setOrders(prev => prev.filter(o => o.id !== orderId));
 
   const addManualCreditEntry = (customerName: string, description: string, amount: number) => {
@@ -325,12 +345,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   return (
     <DataContext.Provider value={{
-      tables, orders, products, customers,
+      tables, orders, products, customers, qrSettings,
       addTable, editTable, deleteTable,
       getActiveOrderForTable, createOrder,
       addItemToOrder, updateItemQuantity, removeItemFromOrder,
       completeOrder, payCredit, deleteOrder, addManualCreditEntry,
       addProduct, editProduct, deleteProduct, addCustomer, assignCustomerToOrder,
+      updateQrSettings,
       todaySales, todayOrders: todayOrders.length, paidAmount, pendingAmount,
     }}>
       {children}

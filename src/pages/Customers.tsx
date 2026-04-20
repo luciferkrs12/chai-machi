@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Layout from "@/components/Layout";
 import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
@@ -15,7 +15,7 @@ interface SettleOrder {
 
 const Customers: React.FC = () => {
   const { user } = useAuth();
-  const { customers, orders, addCustomer, payCredit } = useData();
+  const { customers, orders, addCustomer, payCredit, qrSettings, updateQrSettings } = useData();
 
   const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -23,6 +23,13 @@ const Customers: React.FC = () => {
   const [newCustomerName, setNewCustomerName] = useState("");
   const [newCustomerPhone, setNewCustomerPhone] = useState("");
   const [newCustomerCollege, setNewCustomerCollege] = useState("");
+  const [qrForm, setQrForm] = useState(qrSettings);
+  const [qrSaved, setQrSaved] = useState(false);
+  const [isEditingQr, setIsEditingQr] = useState(false);
+
+  useEffect(() => {
+    setQrForm(qrSettings);
+  }, [qrSettings]);
 
   // Settle payment modal state
   const [settlingOrder, setSettlingOrder] = useState<SettleOrder | null>(null);
@@ -60,6 +67,13 @@ const Customers: React.FC = () => {
     setNewCustomerPhone("");
     setNewCustomerCollege("");
     setShowAddModal(false);
+  };
+
+  const handleSaveQrSettings = () => {
+    updateQrSettings(qrForm);
+    setQrSaved(true);
+    setIsEditingQr(false);
+    window.setTimeout(() => setQrSaved(false), 2000);
   };
 
   const handleSettleClick = (orderId: string, amount: number) => {
@@ -192,8 +206,9 @@ const Customers: React.FC = () => {
     printWindow.print();
   };
 
-  const upiUrl = settlingOrder
-    ? "upi://pay?pa=srivinayagabakes@upi&pn=Sri Vinayaga Bakes&am=" + settlingOrder.amount + "&cu=INR"
+  const upiConfigured = qrSettings.enableQr && qrSettings.upiId.trim().length > 0;
+  const upiUrl = settlingOrder && upiConfigured
+    ? `upi://pay?pa=${encodeURIComponent(qrSettings.upiId)}&pn=${encodeURIComponent(qrSettings.merchantName)}&am=${settlingOrder.amount}&cu=INR`
     : "";
 
   return (
@@ -212,6 +227,109 @@ const Customers: React.FC = () => {
           <p className="text-sm text-muted-foreground font-semibold">Total Collected</p>
           <p className="mt-3 text-3xl font-bold text-success">₹{totalCollectedAmount}</p>
         </div>
+      </div>
+
+      {/* QR Payment Settings */}
+      <div className="rounded-xl border bg-card p-4 md:p-6 shadow-sm mb-6">
+        <div className="flex flex-col gap-4 mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold text-foreground">QR Payment Settings</h2>
+              <p className="text-sm text-muted-foreground">Enable UPI QR and configure your payment details.</p>
+            </div>
+            {!isEditingQr && (
+              <button
+                onClick={() => setIsEditingQr(true)}
+                className="w-full sm:w-auto rounded-lg border px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted transition"
+              >
+                Edit Settings
+              </button>
+            )}
+          </div>
+        </div>
+
+        {!isEditingQr ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="bg-muted/30 rounded-lg p-3">
+                <label className="block text-sm font-medium text-foreground mb-1">Enable QR Code</label>
+                <p className="text-sm text-muted-foreground">{qrSettings.enableQr ? "Enabled" : "Disabled"}</p>
+              </div>
+              <div className="bg-muted/30 rounded-lg p-3">
+                <label className="block text-sm font-medium text-foreground mb-1">UPI ID</label>
+                <p className="text-sm text-muted-foreground break-all">{qrSettings.upiId || "Not set"}</p>
+              </div>
+              <div className="bg-muted/30 rounded-lg p-3 sm:col-span-2 lg:col-span-1">
+                <label className="block text-sm font-medium text-foreground mb-1">QR Image URL</label>
+                <p className="text-sm text-muted-foreground break-all">{qrSettings.qrImageUrl || "Auto-generated"}</p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="bg-muted/30 rounded-lg p-3">
+              <label className="inline-flex items-center gap-3 cursor-pointer w-full">
+                <input
+                  type="checkbox"
+                  checked={qrForm.enableQr}
+                  onChange={e => setQrForm(prev => ({ ...prev, enableQr: e.target.checked }))}
+                  className="h-5 w-5 rounded border-muted bg-background text-primary focus:ring-primary"
+                />
+                <div>
+                  <span className="text-sm font-medium text-foreground">Enable UPI QR payments</span>
+                  <p className="text-xs text-muted-foreground">Allow customers to pay via QR code</p>
+                </div>
+              </label>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">UPI ID</label>
+                <input
+                  type="text"
+                  value={qrForm.upiId}
+                  onChange={e => setQrForm(prev => ({ ...prev, upiId: e.target.value }))}
+                  placeholder="yourname@upi"
+                  className="w-full rounded-lg border bg-background px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">QR Image URL (optional)</label>
+                <input
+                  type="text"
+                  value={qrForm.qrImageUrl}
+                  onChange={e => setQrForm(prev => ({ ...prev, qrImageUrl: e.target.value }))}
+                  placeholder="https://..."
+                  className="w-full rounded-lg border bg-background px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-primary"
+                />
+                <p className="text-xs text-muted-foreground mt-2">Leave empty to auto-generate a QR code from your UPI ID.</p>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2 pt-2">
+              <button
+                onClick={handleSaveQrSettings}
+                className="flex-1 sm:flex-none rounded-lg bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground hover:opacity-90 transition"
+              >
+                Save Changes
+              </button>
+              <button
+                onClick={() => {
+                  setQrForm(qrSettings);
+                  setIsEditingQr(false);
+                }}
+                className="flex-1 sm:flex-none rounded-lg border px-6 py-3 text-sm font-semibold text-foreground hover:bg-muted transition"
+              >
+                Cancel
+              </button>
+            </div>
+            {qrSaved && (
+              <div className="bg-success/10 border border-success/20 rounded-lg p-3">
+                <p className="text-sm text-success font-medium">QR settings saved successfully!</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Search + Add */}
@@ -507,16 +625,26 @@ const Customers: React.FC = () => {
 
                   {settleMethod === "UPI" && (
                     <div className="flex flex-col items-center mb-6 p-4 rounded-xl bg-background border">
-                      <QRCodeSVG value={upiUrl} size={180} />
+                      {qrSettings.qrImageUrl.trim() ? (
+                        <img
+                          src={qrSettings.qrImageUrl}
+                          alt="UPI QR Code"
+                          className="w-44 h-44 object-contain"
+                        />
+                      ) : (
+                        <QRCodeSVG value={upiUrl} size={180} />
+                      )}
                       <p className="text-xs text-muted-foreground mt-3 font-semibold">
-                        Scan to pay ₹{settlingOrder.amount}
+                        {upiConfigured
+                          ? `Scan to pay ₹${settlingOrder.amount}`
+                          : "Configure UPI ID in QR settings to enable UPI payments."}
                       </p>
                     </div>
                   )}
 
                   <button
                     onClick={handleConfirmSettle}
-                    disabled={!settleMethod}
+                    disabled={!settleMethod || (settleMethod === "UPI" && !upiConfigured)}
                     className="w-full py-3 rounded-lg bg-primary text-primary-foreground font-bold text-sm hover:opacity-90 transition disabled:opacity-50"
                   >
                     Confirm Payment — ₹{settlingOrder.amount}

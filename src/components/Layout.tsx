@@ -208,7 +208,27 @@ const Layout: React.FC<Props> = ({ children, title, description }) => {
         </header>
 
         {/* Page content */}
-        <main className="flex-1 p-4 md:p-6 overflow-auto">{children}</main>
+        <main className="flex-1 p-4 md:p-6 overflow-auto pb-20 md:pb-6">{children}</main>
+
+        {/* Mobile Footer */}
+        <footer className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t flex items-center justify-around px-4 py-3 z-40">
+          <div className="flex items-center justify-around w-full max-w-md mx-auto gap-2">
+            {links.slice(0, 5).map(({ to, label, icon: Icon }) => (
+              <Link
+                key={to}
+                to={to}
+                className="flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors text-muted-foreground hover:text-foreground hover:bg-muted flex-1"
+                activeProps={{
+                  className:
+                    "flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg text-xs font-medium transition-colors text-primary bg-primary/10 flex-1",
+                }}
+              >
+                <Icon className="w-5 h-5" />
+                <span className="truncate">{label}</span>
+              </Link>
+            ))}
+          </div>
+        </footer>
       </div>
     </div>
   );

@@ -11,17 +11,21 @@ interface Props {
 }
 
 const PaymentModal: React.FC<Props> = ({ orderId, amount, onClose }) => {
-  const { completeOrder } = useData();
+  const { completeOrder, qrSettings } = useData();
   const [method, setMethod] = useState<"Cash" | "UPI" | null>(null);
   const [done, setDone] = useState(false);
 
+  const upiConfigured = qrSettings.enableQr && qrSettings.upiId.trim().length > 0;
+  const upiUrl = upiConfigured
+    ? `upi://pay?pa=${encodeURIComponent(qrSettings.upiId)}&pn=${encodeURIComponent(qrSettings.merchantName)}&am=${amount}&cu=INR`
+    : "";
+
   const handlePay = () => {
     if (!method) return;
+    if (method === "UPI" && !upiConfigured) return;
     completeOrder(orderId, method);
     setDone(true);
   };
-
-  const upiUrl = `upi://pay?pa=srivinayagabakes@upi&pn=Sri Vinayaga Bakes&am=${amount}&cu=INR`;
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4" onClick={onClose}>
@@ -59,14 +63,24 @@ const PaymentModal: React.FC<Props> = ({ orderId, amount, onClose }) => {
 
             {method === "UPI" && (
               <div className="flex flex-col items-center mb-6 p-4 rounded-xl bg-background border">
-                <QRCodeSVG value={upiUrl} size={180} />
-                <p className="text-xs text-muted-foreground mt-3">Scan to pay ₹{amount}</p>
+                {qrSettings.qrImageUrl.trim() ? (
+                  <img
+                    src={qrSettings.qrImageUrl}
+                    alt="UPI QR Code"
+                    className="w-44 h-44 object-contain"
+                  />
+                ) : (
+                  <QRCodeSVG value={upiUrl} size={180} />
+                )}
+                <p className="text-xs text-muted-foreground mt-3">
+                  {upiConfigured ? `Scan to pay ₹${amount}` : "Configure UPI ID in QR settings to enable UPI payments."}
+                </p>
               </div>
             )}
 
             <button
               onClick={handlePay}
-              disabled={!method}
+              disabled={!method || (method === "UPI" && !upiConfigured)}
               className="w-full py-3 rounded-lg bg-primary text-primary-foreground font-bold text-sm hover:opacity-90 transition disabled:opacity-50"
             >
               Confirm Payment
